@@ -1,0 +1,74 @@
+{{define "keep"}}{{end -}}
+
+{{define "zero" -}}
+{{assert (eq .Depth 0) "zero is only valid on a top-level field" -}}
+{{.Dst}} = {{.Target.Type}}{}.{{.Field.Name}}
+{{end -}}
+
+{{define "clone" -}}
+{{if eq .Shape.Kind "slice" -}}
+{{.Dst}} = {{import "slices"}}.Clone({{.Dst}})
+{{else -}}
+{{.Dst}} = {{import "maps"}}.Clone({{.Dst}})
+{{end -}}
+{{end -}}
+
+{{define "call" -}}
+{{.Dst}} = {{if .Target.Options.receiver.Name}}{{.Target.Options.receiver.Name}}.{{end}}{{ident (index .Rule.Args 0)}}({{.Dst}})
+{{end -}}
+
+{{define "func" -}}
+{{.Dst}} = {{qualified (index .Rule.Args 0)}}({{.Dst}})
+{{end -}}
+
+{{define "method" -}}
+{{.Dst}} = {{.Dst}}.{{ident (index .Rule.Args 0)}}()
+{{end -}}
+
+{{define "snapshot" -}}
+{{$type := .Shape.Written -}}
+{{if eq .Shape.Kind "pointer"}}{{$type = .Shape.Element.Written}}{{end -}}
+{{$callee := targetFor .Target.Recipe $type -}}
+{{$call := $callee.Name -}}
+{{if $callee.Options.receiver.Name -}}
+{{assert (and (ne .Target.Options.receiver.Name "") (eq .Target.Options.receiver.Type $callee.Options.receiver.Type)) (printf "target %s needs receiver %s" $callee.Name $callee.Options.receiver.Type) -}}
+{{$call = printf "%s.%s" .Target.Options.receiver.Name $call -}}
+{{end -}}
+{{if eq .Shape.Kind "pointer" -}}
+if {{.Dst}} != nil {
+    v{{.Depth}} := {{$call}}(*{{.Dst}})
+    {{.Dst}} = &v{{.Depth}}
+}
+{{else -}}
+{{.Dst}} = {{$call}}({{.Dst}})
+{{end -}}
+{{end -}}
+
+{{define "each" -}}
+if {{.Dst}} != nil {
+    {{template "clone" . -}}
+    {{if eq .Shape.Kind "slice" -}}
+    for i{{.Depth}} := range {{.Dst}} {
+        {{child . 0 (printf "%s[i%d]" .Dst .Depth) -}}
+    }
+    {{else -}}
+    for k{{.Depth}}, e{{.Depth}} := range {{.Dst}} {
+        {{child . 0 (printf "e%d" .Depth) -}}
+        {{.Dst}}[k{{.Depth}}] = e{{.Depth}}
+    }
+    {{end -}}
+}
+{{end -}}
+
+{{define "entries" -}}
+if {{.Dst}} != nil {
+    s{{.Depth}} := {{.Dst}}
+    {{.Dst}} = {{import "maps"}}.Clone(s{{.Depth}})
+    clear({{.Dst}})
+    for k{{.Depth}}, e{{.Depth}} := range s{{.Depth}} {
+        {{child . 0 (printf "k%d" .Depth) -}}
+        {{child . 1 (printf "e%d" .Depth) -}}
+        {{.Dst}}[k{{.Depth}}] = e{{.Depth}}
+    }
+}
+{{end -}}

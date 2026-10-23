@@ -1,0 +1,8 @@
+{{define "target" -}}
+// {{.Name}} returns a snapshot of {{.Type}}. Every field has an explicit boiler rule.
+func {{if .Options.receiver.Name}}({{.Options.receiver.Name}} {{.Options.receiver.Type}}) {{end}}{{.Name}}(in {{.Type}}) {{.Type}} {
+    out := in
+    {{range .Fields}}{{emit . (printf "out.%s" .Name)}}{{end -}}
+    return out
+}
+{{end -}}

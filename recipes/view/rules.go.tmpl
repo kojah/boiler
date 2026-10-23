@@ -1,0 +1,47 @@
+{{define "hide"}}{{end -}}
+
+{{define "get" -}}
+{{$name := ident (arg .Rule 0 .Field.Name) -}}
+{{$type := ""}}{{$expr := .Dst -}}
+{{if or (eq .Shape.Kind "slice") (eq .Shape.Kind "map") -}}
+{{assert (ne .Target.Readonly "") "slice and map getters need the config's readonly package" -}}
+{{$ro := import .Target.Readonly -}}
+{{if eq .Shape.Kind "slice" -}}
+{{$type = printf "%s.Slice[%s]" $ro .Shape.Element.Type -}}
+{{$expr = printf "%s.Borrow(%s)" $ro .Dst -}}
+{{else -}}
+{{$type = printf "%s.Map[%s, %s]" $ro .Shape.Key.Type .Shape.Element.Type -}}
+{{$expr = printf "%s.BorrowMap(%s)" $ro .Dst -}}
+{{end -}}
+{{else}}{{$type = .Shape.Type}}{{end -}}
+{{template "accessor" (dict "Target" .Target "Name" $name "Type" $type "Expr" $expr "Doc" (printf "returns the published %s field" .Field.Name)) -}}
+{{end -}}
+
+{{define "wrap" -}}
+{{$wrapper := ident (index .Rule.Args 0) -}}
+{{$name := ident (arg .Rule 1 .Field.Name) -}}
+{{template "accessor" (dict "Target" .Target "Name" $name "Type" $wrapper "Expr" (printf "%s{%s}" $wrapper .Dst) "Doc" (printf "wraps the published %s field" .Field.Name)) -}}
+{{end -}}
+
+{{define "list" -}}
+{{$wrapper := ident (index .Rule.Args 0) -}}
+{{$one := ident (index .Rule.Args 1) -}}
+{{$many := ident (index .Rule.Args 2) -}}
+{{$receiver := .Target.Options.receiver}}{{$data := printf "%s.%s" $receiver .Target.Options.value -}}
+// {{$one}}Count returns the number of {{.Field.Name}} elements.
+func ({{$receiver}} {{.Target.Name}}) {{$one}}Count() int {
+    {{if eq .Target.Options.holder "pointer"}}if {{$data}} == nil { return 0 }{{end}}
+    return len({{.Dst}})
+}
+// {{$one}} returns the indexed {{.Field.Name}} element. An invalid index panics.
+func ({{$receiver}} {{.Target.Name}}) {{$one}}(index int) {{$wrapper}} { return {{$wrapper}}{ {{.Dst}}[index] } }
+// {{$many}} visits {{.Field.Name}} elements in order.
+func ({{$receiver}} {{.Target.Name}}) {{$many}}() {{import "iter"}}.Seq2[int, {{$wrapper}}] {
+    return func(yield func(int, {{$wrapper}}) bool) {
+        {{if eq .Target.Options.holder "pointer"}}if {{$data}} == nil { return }{{end}}
+        for i, element := range {{.Dst}} {
+            if !yield(i, {{$wrapper}}{element}) { return }
+        }
+    }
+}
+{{end -}}

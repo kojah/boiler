@@ -1,0 +1,19 @@
+{{define "target" -}}
+// {{.Name}} visits every {{.Options.child}} child of a {{.Type}} in field order and reports
+// whether all were visited.
+func {{.Name}}(in {{.Type}}, visit func({{.Options.child}}) bool) bool {
+    {{range .Fields}}{{emit . (printf "in.%s" .Name)}}{{end -}}
+    return true
+}
+{{end -}}
+{{define "keep"}}{{end -}}
+{{define "apply" -}}
+{{assert (eq .Shape.Written .Target.Options.child) (printf "apply needs a %s field" .Target.Options.child) -}}
+if !visit({{.Dst}}) { return false }
+{{end -}}
+{{define "each" -}}
+{{assert (eq .Shape.Element.Written .Target.Options.child) (printf "each needs a []%s field" .Target.Options.child) -}}
+for _, element := range {{.Dst}} {
+    if !visit(element) { return false }
+}
+{{end -}}

@@ -1,0 +1,24 @@
+{{define "target" -}}
+{{$values := dict}}{{$params := dict -}}
+{{range .Options.params}}{{put $params .Name .Name}}{{end -}}
+{{range .Fields -}}
+    {{if eq .Rule.Name "to" -}}
+        {{$field := ident (index .Rule.Args 0)}}{{$expr := printf "in.%s" .Name -}}
+        {{if eq (len .Rule.Args) 3 -}}
+            {{assert (eq (index .Rule.Args 1) "from") "to expects FIELD or FIELD from PARAM" -}}
+            {{$expr = take $params (index .Rule.Args 2) -}}
+        {{end -}}
+        {{put $values $field $expr -}}
+    {{end -}}
+{{end -}}
+{{empty $params -}}
+// {{.Name}} projects a {{.Type}} onto its {{.Options.result}} key.
+func {{.Name}}(in {{.Type}}{{range .Options.params}}, {{.Name}} {{.Type}}{{end}}) {{.Options.result}} {
+    return {{.Options.result}}{
+        {{range structFields .Options.result}}{{.Name}}: {{take $values .Name}},{{end}}
+    }
+}
+{{empty $values -}}
+{{end -}}
+{{define "omit"}}{{end -}}
+{{define "to"}}{{end -}}

@@ -1,0 +1,18 @@
+{{define "target" -}}
+// {{.Name}} rebuilds every {{.Options.child}} child of a {{.Type}}; other fields are kept.
+func {{.Name}}(in {{.Type}}, rewrite func({{.Options.child}}) {{.Options.child}}) {{.Type}} {
+    out := in
+    {{range .Fields}}{{emit . (printf "out.%s" .Name)}}{{end -}}
+    return out
+}
+{{end -}}
+{{define "keep"}}{{end -}}
+{{define "apply" -}}
+{{assert (eq .Shape.Written .Target.Options.child) (printf "apply needs a %s field" .Target.Options.child) -}}
+{{.Dst}} = rewrite(in.{{.Field.Name}})
+{{end -}}
+{{define "each" -}}
+{{assert (eq .Shape.Element.Written .Target.Options.child) (printf "each needs a []%s field" .Target.Options.child) -}}
+{{.Dst}} = {{import "slices"}}.Clone(in.{{.Field.Name}})
+for i := range {{.Dst}} { {{.Dst}}[i] = rewrite({{.Dst}}[i]) }
+{{end -}}

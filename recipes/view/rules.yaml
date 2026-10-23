@@ -1,0 +1,8 @@
+hide: {}
+get:
+  args: [0, 1]
+wrap:
+  args: [1, 2]
+list:
+  args: [3]
+  accepts: [slice]

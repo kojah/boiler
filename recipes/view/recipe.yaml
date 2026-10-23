@@ -1,0 +1,11 @@
+version: 1
+entry: target
+templates: ["*.go.tmpl"]
+rules: rules.yaml
+local: true
+options:
+  receiver: {kind: identifier, default: v}
+  value: {kind: identifier, default: value}
+  holder: {kind: string, default: pointer}
+  declare: {kind: bool, default: true}
+  doc: {kind: string}

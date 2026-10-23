@@ -1,0 +1,40 @@
+// Field-complete generation: every field requires an explicit rule.
+readonly = "examples/immutable/readonly"
+
+recipe snapshot = "boiler:snapshot"
+recipe view = "boiler:view"
+recipe visit = "boiler:visit"
+recipe transform = "boiler:transform"
+recipe key = "boiler:key"
+
+output "boiler_immutable_gen.go" {
+    snapshot snapshotGraph(Graph) receiver(p *publication) {
+        Name = keep
+        Nodes = each(call node)
+        Labels = clone
+        Roots = entries(call node, keep)
+        scratch = zero
+    }
+
+    snapshot snapshotNode(Node) receiver(p *publication) {
+        ID = keep
+        Edges = clone
+        Owner = call node
+    }
+
+    view NodeView(Node) doc("NodeView reads one published node.") {
+        ID, Edges = get
+        Owner = wrap NodeView
+    }
+
+    view Published(Graph) declare(false) value(graph) receiver(g) {
+        Name, Labels = get
+        Nodes = list NodeView Node Nodes
+        Roots, scratch = hide
+    }
+
+    visit visitNodes(Graph) child(*Node) {
+        Name, Labels, Roots, scratch = keep
+        Nodes = each
+    }
+}

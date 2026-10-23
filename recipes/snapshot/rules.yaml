@@ -1,0 +1,17 @@
+keep: {}
+zero: {}
+clone:
+  accepts: [slice, map]
+snapshot: {}
+call:
+  args: [1]
+func:
+  args: [1]
+method:
+  args: [1]
+each:
+  accepts: [slice, map]
+  children: [element]
+entries:
+  accepts: [map]
+  children: [key, element]

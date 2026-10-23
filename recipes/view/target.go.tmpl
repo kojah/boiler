@@ -1,0 +1,26 @@
+{{define "target" -}}
+{{assert (or (eq .Options.holder "pointer") (eq .Options.holder "value")) "holder must be pointer or value" -}}
+{{if .Options.declare -}}
+{{if .Options.doc}}{{comment .Options.doc}}{{else}}// {{.Name}} reads a {{.Type}} without exposing mutable storage.{{end}}
+type {{.Name}} struct { {{.Options.value}} {{if eq .Options.holder "pointer"}}*{{end}}{{.Type}} }
+{{if eq .Options.holder "pointer" -}}
+// Valid reports whether the view holds a {{.Type}}.
+func ({{.Options.receiver}} {{.Name}}) Valid() bool { return {{.Options.receiver}}.{{.Options.value}} != nil }
+{{end -}}
+{{end -}}
+{{range .Fields}}{{emit . (printf "%s.%s.%s" $.Options.receiver $.Options.value .Name)}}{{end -}}
+{{end -}}
+
+{{define "accessor" -}}
+// {{.Name}} {{.Doc}}.
+{{if eq .Target.Options.holder "value" -}}
+func ({{.Target.Options.receiver}} {{.Target.Name}}) {{.Name}}() {{.Type}} { return {{.Expr}} }
+{{else -}}
+func ({{.Target.Options.receiver}} {{.Target.Name}}) {{.Name}}() (result {{.Type}}) {
+    if {{.Target.Options.receiver}}.{{.Target.Options.value}} != nil {
+        result = {{.Expr}}
+    }
+    return result
+}
+{{end -}}
+{{end -}}

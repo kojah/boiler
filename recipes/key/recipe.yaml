@@ -1,0 +1,8 @@
+version: 1
+entry: target
+templates: ["*.go.tmpl"]
+rules: rules.yaml
+local: true
+options:
+  result: {kind: type, required: true}
+  params: {kind: params}

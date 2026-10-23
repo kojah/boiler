@@ -1,0 +1,4 @@
+keep: {}
+apply: {}
+each:
+  accepts: [slice]
