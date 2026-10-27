@@ -87,3 +87,43 @@ output "p/boiler_outer_gen.go" {
 		}
 	}
 }
+
+// TestMethodTargetsShareNames checks that a recipe emitting methods can use
+// one target name for several receiver types, while a repeated name and
+// type is still rejected.
+func TestMethodTargetsShareNames(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "go.mod"), "module example.com/m\n\ngo 1.24\n")
+	write(t, filepath.Join(root, "p", "p.go"), "package p\n\ntype A struct{ N int }\n\ntype B struct{ M, K int }\n")
+	write(t, filepath.Join(root, "recipes", "sum", "recipe.yaml"),
+		"version: 1\nentry: target\ntemplates: [\"*.go.tmpl\"]\nrules: rules.yaml\nlocal: true\noptions: {}\n")
+	write(t, filepath.Join(root, "recipes", "sum", "rules.yaml"), "sum: {}\n")
+	write(t, filepath.Join(root, "recipes", "sum", "target.go.tmpl"), `{{define "target" -}}
+func (work *{{.Type}}) {{.Name}}(other {{.Type}}) {
+{{range .Fields}}{{emit . .Name}}{{end -}}
+}
+{{end -}}
+{{define "sum"}}work.{{.Dst}} += other.{{.Dst}}
+{{end -}}
+`)
+	path := filepath.Join(root, "generate.boiler")
+	targets := "sum Add(A) { N = sum }\nsum Add(B) { M, K = sum }\n"
+	write(t, path, "recipe sum = \"recipes/sum\"\noutput \"p/boiler_sum_gen.go\" {\n"+targets+"}\n")
+	config, err := boiler.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifacts, err := config.Compile("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"func (work *A) Add(other A)", "func (work *B) Add(other B)", "work.K += other.K"} {
+		if !strings.Contains(string(artifacts[0].Data), want) {
+			t.Fatalf("generated code lacks %q:\n%s", want, artifacts[0].Data)
+		}
+	}
+	write(t, path, "recipe sum = \"recipes/sum\"\noutput \"p/boiler_sum_gen.go\" {\n"+targets+"sum Add(A) { N = sum }\n}\n")
+	if _, err := boiler.Load(path); err == nil || !strings.Contains(err.Error(), "duplicate target") {
+		t.Fatalf("repeated name and type accepted: %v", err)
+	}
+}

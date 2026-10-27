@@ -90,6 +90,9 @@ aliases are resolved after all sources are read, with no order-dependent overrid
 Duplicate aliases, settings and resolved output paths fail validation.
 
 A target is `RECIPE NAME(TYPE) OPTION(ARGUMENTS)... { FIELD_RULES }`.
+Target names are unique per output and type, so a recipe that emits methods can
+use one name, such as `Add`, for several receiver types; Go type checking still
+rejects two plain functions sharing a name.
 A package block supplies the directory once for all its output filenames.
 For example, `package "internal/example"` with `output "boiler_graph_gen.go"`
 resolves to `internal/example/boiler_graph_gen.go`. `--output PATH` selects that

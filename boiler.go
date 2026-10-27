@@ -107,12 +107,15 @@ func (c *Config) validate() error {
 		}
 	}
 	for _, output := range c.Outputs {
-		seen := map[string]bool{}
+		// A name may repeat across types: method recipes emit one name per
+		// receiver type. Two functions sharing a name fail type checking.
+		seen := map[[2]string]bool{}
 		for _, target := range output.Targets {
-			if !identifier(target.Name) || seen[target.Name] {
+			key := [2]string{target.Name, target.Type}
+			if !identifier(target.Name) || seen[key] {
 				return fmt.Errorf("output %s: invalid or duplicate target %q", output.Out, target.Name)
 			}
-			seen[target.Name] = true
+			seen[key] = true
 			if _, ok := c.Recipes[target.Recipe]; !ok {
 				return fmt.Errorf("target %s: unknown recipe %q", target.Name, target.Recipe)
 			}
