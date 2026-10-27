@@ -20,7 +20,7 @@ type typeShape struct {
 	depth         int
 }
 
-func (s *typeShape) Type() (string, error) { return s.u.typeText(s.field, s.expr) }
+func (s *typeShape) Type() (string, error) { return s.u.typeText(s.src, s.field, s.expr) }
 
 // Resolve children only when requested. Eager expansion of recursive named
 // maps (for example map[*M]*M) would grow exponentially before any rule ran.
@@ -39,7 +39,7 @@ func (u *unit) shape(src *source, f field, expr ast.Expr, depth int) *typeShape 
 		return nil
 	}
 	kind, _, _ := src.shapeOf(expr)
-	return &typeShape{Kind: []string{"other", "pointer", "slice", "map"}[kind], Written: u.loader.text(expr),
+	return &typeShape{Kind: []string{"other", "pointer", "slice", "map"}[kind], Written: u.written(src, expr),
 		u: u, src: src, field: f, expr: expr, depth: depth}
 }
 

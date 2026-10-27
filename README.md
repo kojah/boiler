@@ -207,7 +207,9 @@ options:
 
 `local: true` restricts the source to a struct in the output package. Otherwise
 qualified structs such as `core.MemoryCell` are allowed when their fields are
-exported. Templates and rules paths must stay below the recipe directory.
+exported. Field types of a qualified struct are spelled as the output package
+writes them: that package's own type names gain the configured qualifier, so
+a `*Inner` field of `q.Outer` resolves the `q.Inner` target. Templates and rules paths must stay below the recipe directory.
 Template globs are sorted, duplicate filenames are errors, and missing template
 values fail rather than silently rendering `<no value>`.
 
@@ -351,6 +353,9 @@ Views default to `receiver: v`, `value: value`, `holder: pointer` and
 for empty views. Value holders omit `Valid()`. `declare: false` attaches methods
 to a handwritten type. `get` wraps containers using the configured read-only
 package. `list` generates count, indexed access and iteration methods.
+
+Keys may project a qualified struct whose fields are exported into a result
+type owned by the output package.
 
 Visits stop when a callback returns false. Transforms rebuild traversed slices
 and preserve other fields. Keys require every result field and every parameter

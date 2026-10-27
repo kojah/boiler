@@ -6,6 +6,8 @@ import (
 	"go/ast"
 	"go/format"
 	"go/parser"
+	"go/printer"
+	"go/token"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -53,6 +55,9 @@ type unit struct {
 	body      bytes.Buffer
 	targets   []Target
 	allocated map[string]bool
+	// foreign maps a qualified target's source package to the qualifier the
+	// configuration wrote, so that package's own type names print qualified.
+	foreign map[*source]string
 }
 
 func (c *Config) compileOutput(l *loader, output Output) ([]byte, error) {
@@ -92,6 +97,10 @@ func (u *unit) structOf(written string) ([]field, *source, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	if u.foreign == nil {
+		u.foreign = map[*source]string{}
+	}
+	u.foreign[src] = qualifier
 	for _, f := range fields {
 		if !ast.IsExported(f.name) {
 			return nil, nil, fmt.Errorf("%s has unexported field %s; generate inside its package instead", written, f.name)
@@ -145,13 +154,55 @@ func (u *unit) use(qualifier string, file *ast.File) (string, error) {
 }
 
 // typeText prints a field type for the generated file, importing what it uses.
-func (u *unit) typeText(f field, expr ast.Expr) (string, error) {
+func (u *unit) typeText(src *source, f field, expr ast.Expr) (string, error) {
 	for _, qualifier := range qualifiers(expr) {
 		if _, err := u.use(qualifier, f.file); err != nil {
 			return "", err
 		}
 	}
-	return u.loader.text(expr), nil
+	return u.written(src, expr), nil
+}
+
+// written prints a field type as the output package spells it: a qualified
+// target's own exported type names gain the configuration's qualifier.
+func (u *unit) written(src *source, expr ast.Expr) string {
+	text := u.loader.text(expr)
+	qualifier := u.foreign[src]
+	if qualifier == "" {
+		return text
+	}
+	parsed, err := parser.ParseExpr(text)
+	if err != nil {
+		return text
+	}
+	qualifyNames(parsed, qualifier)
+	var out bytes.Buffer
+	if err := printer.Fprint(&out, token.NewFileSet(), parsed); err != nil {
+		return text
+	}
+	return out.String()
+}
+
+// qualifyNames prefixes the exported type names expr declares in its own
+// package. Selectors are already qualified; field and parameter names are
+// not types.
+func qualifyNames(expr ast.Node, qualifier string) {
+	ast.Inspect(expr, func(node ast.Node) bool {
+		switch node := node.(type) {
+		case *ast.SelectorExpr:
+			return false
+		case *ast.Field:
+			if node.Type != nil {
+				qualifyNames(node.Type, qualifier)
+			}
+			return false
+		case *ast.Ident:
+			if ast.IsExported(node.Name) {
+				node.Name = qualifier + "." + node.Name
+			}
+		}
+		return true
+	})
 }
 
 // useWritten imports the qualifiers of a type written in the configuration.
