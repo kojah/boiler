@@ -63,8 +63,7 @@ if {{.Dst}} != nil {
 {{define "entries" -}}
 if {{.Dst}} != nil {
     s{{.Depth}} := {{.Dst}}
-    {{.Dst}} = {{import "maps"}}.Clone(s{{.Depth}})
-    clear({{.Dst}})
+    {{.Dst}} = make({{.Shape.Type}}, len(s{{.Depth}}))
     for k{{.Depth}}, e{{.Depth}} := range s{{.Depth}} {
         {{child . 0 (printf "k%d" .Depth) -}}
         {{child . 1 (printf "e%d" .Depth) -}}
