@@ -183,6 +183,8 @@ func (e *expansion) child(ctx ruleContext, index int, dst string) (string, error
 
 // targetFor resolves one explicitly requested recipe/type pair in this output.
 // It returns data, leaving call syntax and receiver compatibility to templates.
+// Fields carry the target's parsed rules, so a template can account for the
+// coverage of a target it composes; that target's own expansion validates them.
 func (e *expansion) targetFor(recipeName, typ string) (*targetData, error) {
 	var found *targetData
 	for _, t := range e.u.targets {
@@ -201,6 +203,17 @@ func (e *expansion) targetFor(recipeName, typ string) (*targetData, error) {
 			return nil, err
 		}
 		found = &targetData{Name: t.Name, Type: t.Type, Recipe: t.Recipe, Options: options}
+		fields, src, err := e.u.structOf(t.Type)
+		if err != nil {
+			return nil, err
+		}
+		parsed, err := rules(fields, t.Fields)
+		if err != nil {
+			return nil, err
+		}
+		for i, f := range fields {
+			found.Fields = append(found.Fields, &fieldData{Name: f.name, Shape: e.u.shape(src, f, f.typ, 0), Rule: parsed[i]})
+		}
 	}
 	if found == nil {
 		return nil, fmt.Errorf("no %s target for %s in this output", recipeName, typ)

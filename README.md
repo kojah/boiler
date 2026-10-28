@@ -309,7 +309,7 @@ Additional helpers, alongside standard `text/template` functions:
 | `assert BOOL MESSAGE` | Fail generation with a contextual error if false |
 | `arg RULE INDEX DEFAULT` | Read an optional argument |
 | `comment TEXT` | Render text as Go line comments |
-| `targetFor RECIPE TYPE` | Resolve one target in the same output, returning name/type/options; missing or ambiguous is an error |
+| `targetFor RECIPE TYPE` | Resolve one target in the same output, returning name/type/options and its fields with their rules; missing or ambiguous is an error |
 | `structFields TYPE` | Inspect another struct's fields for projection coverage |
 | `dict KEY VALUE ...` | Create template-local bindings |
 | `put DICT KEY VALUE` | Bind once; duplicate is an error |
