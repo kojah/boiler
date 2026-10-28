@@ -127,3 +127,103 @@ func (work *{{.Type}}) {{.Name}}(other {{.Type}}) {
 		t.Fatalf("repeated name and type accepted: %v", err)
 	}
 }
+
+// TestAliasTargets checks targets that name structs through aliases: a local
+// alias, a chain across two packages into a package the output does not
+// import, and fields typed through aliases finding the snapshot targets
+// written for other spellings of the same struct. Signatures keep the alias.
+func TestAliasTargets(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "go.mod"), "module example.com/m\n\ngo 1.24\n")
+	write(t, filepath.Join(root, "d", "d.go"), `package d
+
+type Work struct {
+	Inner *Inner
+	Steps []Step
+	N     int
+}
+
+type Inner struct{ M int }
+
+type Step struct{ Name string }
+
+type Hidden struct{ secret int }
+`)
+	write(t, filepath.Join(root, "api", "api.go"), "package api\n\nimport \"example.com/m/d\"\n\ntype (\n\tWork   = d.Work\n\tInner  = d.Inner\n\tHidden = d.Hidden\n)\n")
+	write(t, filepath.Join(root, "facts", "facts.go"), "package facts\n\nimport \"example.com/m/api\"\n\ntype (\n\tQueryWork = api.Work\n\tInner     = api.Inner\n\tHidden    = api.Hidden\n)\n")
+	write(t, filepath.Join(root, "p", "p.go"), `package p
+
+import "example.com/m/facts"
+
+type state struct {
+	work  facts.QueryWork
+	local *Local
+	count int
+}
+
+type local struct{ n int }
+
+type Local = local
+`)
+	if err := os.CopyFS(filepath.Join(root, "recipes", "snapshot"), os.DirFS(filepath.Join("recipes", "snapshot"))); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "generate.boiler")
+	write(t, path, `recipe snapshot = "recipes/snapshot"
+output "p/boiler_alias_gen.go" {
+    snapshot snapshotState(state) {
+        work, local = snapshot
+        count = keep
+    }
+    snapshot snapshotWork(facts.QueryWork) {
+        Inner = snapshot
+        Steps = clone
+        N = keep
+    }
+    snapshot snapshotInner(facts.Inner) {
+        M = keep
+    }
+    snapshot snapshotLocal(Local) {
+        n = keep
+    }
+}
+`)
+	config, err := boiler.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifacts, err := config.Compile("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated := string(artifacts[0].Data)
+	for _, want := range []string{
+		"out.work = snapshotWork(out.work)",
+		"v0 := snapshotLocal(*out.local)",
+		"func snapshotWork(in facts.QueryWork) facts.QueryWork",
+		"v0 := snapshotInner(*out.Inner)",
+		"func snapshotInner(in facts.Inner) facts.Inner",
+		"func snapshotLocal(in Local) Local",
+	} {
+		if !strings.Contains(generated, want) {
+			t.Fatalf("generated code lacks %q:\n%s", want, generated)
+		}
+	}
+
+	// A struct reached through an alias in another package keeps the
+	// unexported-field rule and names the declaration.
+	write(t, path, `recipe snapshot = "recipes/snapshot"
+output "p/boiler_alias_gen.go" {
+    snapshot snapshotHidden(facts.Hidden) {
+        secret = keep
+    }
+}
+`)
+	config, err = boiler.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := config.Compile(""); err == nil || !strings.Contains(err.Error(), "alias of example.com/m/d.Hidden, which has unexported field secret") {
+		t.Fatalf("unexported field through an alias accepted: %v", err)
+	}
+}

@@ -26,6 +26,9 @@ func (u *unit) reservedNames() map[string]bool {
 	for name := range u.imports {
 		names[name] = true
 	}
+	for _, name := range u.foreign {
+		names[name] = true
+	}
 	return names
 }
 
@@ -37,10 +40,21 @@ func (e *expansion) fresh(prefix string) (string, error) {
 		e.names = e.u.reservedNames()
 	}
 	name := prefix
-	for i := 2; e.names[name] || e.u.imports[name] != ""; i++ {
+	for i := 2; e.names[name] || e.u.imports[name] != "" || e.u.foreignNamed(name); i++ {
 		name = fmt.Sprintf("%s%d", prefix, i)
 	}
 	e.names[name] = true
 	e.u.allocated[name] = true
 	return name, nil
+}
+
+// foreignNamed reports whether name is the qualifier chosen for a foreign
+// package, which is reserved before any type using it is printed.
+func (u *unit) foreignNamed(name string) bool {
+	for _, qualifier := range u.foreign {
+		if qualifier == name {
+			return true
+		}
+	}
+	return false
 }

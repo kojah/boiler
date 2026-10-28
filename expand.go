@@ -24,21 +24,23 @@ func (s *typeShape) Type() (string, error) { return s.u.typeText(s.src, s.field,
 
 // Resolve children only when requested. Eager expansion of recursive named
 // maps (for example map[*M]*M) would grow exponentially before any rule ran.
+// A container reached through an alias in another package has its element
+// and key written in that package, so they carry its source and file.
 func (s *typeShape) Element() *typeShape {
-	_, elem, _ := s.src.shapeOf(s.expr)
-	return s.u.shape(s.src, s.field, elem, s.depth+1)
+	_, elem, _, src, file := s.u.loader.shapeOf(s.src, s.field.file, s.expr)
+	return s.u.shape(src, field{name: s.field.name, typ: s.field.typ, file: file}, elem, s.depth+1)
 }
 
 func (s *typeShape) Key() *typeShape {
-	_, _, key := s.src.shapeOf(s.expr)
-	return s.u.shape(s.src, s.field, key, s.depth+1)
+	_, _, key, src, file := s.u.loader.shapeOf(s.src, s.field.file, s.expr)
+	return s.u.shape(src, field{name: s.field.name, typ: s.field.typ, file: file}, key, s.depth+1)
 }
 
 func (u *unit) shape(src *source, f field, expr ast.Expr, depth int) *typeShape {
 	if expr == nil || depth > 64 {
 		return nil
 	}
-	kind, _, _ := src.shapeOf(expr)
+	kind, _, _, _, _ := u.loader.shapeOf(src, f.file, expr)
 	return &typeShape{Kind: []string{"other", "pointer", "slice", "map"}[kind], Written: u.written(src, expr),
 		u: u, src: src, field: f, expr: expr, depth: depth}
 }
@@ -86,6 +88,9 @@ func (u *unit) expand(target Target) error {
 	fields, src, err := u.structOf(target.Type)
 	if err != nil {
 		return err
+	}
+	if r.Local && src != u.pkg {
+		return fmt.Errorf("recipe %s requires a local type; %s is declared in %s", target.Recipe, target.Type, src.path)
 	}
 	parsed, err := rules(fields, target.Fields)
 	if err != nil {
@@ -188,7 +193,7 @@ func (e *expansion) child(ctx ruleContext, index int, dst string) (string, error
 func (e *expansion) targetFor(recipeName, typ string) (*targetData, error) {
 	var found *targetData
 	for _, t := range e.u.targets {
-		if t.Recipe != recipeName || t.Type != typ {
+		if t.Recipe != recipeName || t.Type != typ && !e.u.sameNamed(t.Type, typ) {
 			continue
 		}
 		if found != nil {

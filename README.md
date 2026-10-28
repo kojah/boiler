@@ -212,7 +212,19 @@ options:
 qualified structs such as `core.MemoryCell` are allowed when their fields are
 exported. Field types of a qualified struct are spelled as the output package
 writes them: that package's own type names gain the configured qualifier, so
-a `*Inner` field of `q.Outer` resolves the `q.Inner` target. Templates and rules paths must stay below the recipe directory.
+a `*Inner` field of `q.Outer` resolves the `q.Inner` target.
+
+A target may name its struct through a type alias (`type A = B`, local or
+qualified, chained across module packages). Boiler follows the alias
+declarations to the struct and generates as if the target had named it, while
+signatures keep the written alias. A struct reached in another package follows
+the qualified-struct rules above; if the output does not import that package,
+Boiler imports it under a fresh qualifier when a printed type needs it. Field
+shapes see through aliases, and `targetFor` matches a written type by the
+declaration it resolves to, so a field typed `q.Alias` finds a target written
+for the aliased struct and the reverse.
+
+Templates and rules paths must stay below the recipe directory.
 Template globs are sorted, duplicate filenames are errors, and missing template
 values fail rather than silently rendering `<no value>`.
 
@@ -372,7 +384,8 @@ to be consumed exactly once; caller-supplied IDs keep projection pure.
 ## Limits
 
 Generic structs and packages outside the module are unsupported. Source
-inspection does not fully resolve aliases or foreign named containers; use
+inspection follows aliases but not foreign named containers, generic aliases
+or aliases into packages outside the module; use
 explicit hook rules there. Go builds remain responsible for type checking and
 comparability. A recipe can define its own rules without changing or rebuilding
 the compiler. Sophisticated algorithms should remain handwritten hooks rather

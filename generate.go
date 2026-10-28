@@ -77,36 +77,43 @@ func (c *Config) compileOutput(l *loader, output Output) ([]byte, error) {
 	return u.render()
 }
 
-// structOf resolves a target's struct. A qualified name reads another
-// module package, whose fields must then all be exported.
+// structOf resolves a target's struct, following aliases to the declaration.
+// A struct in another module package must have only exported fields; its
+// own type names print qualified.
 func (u *unit) structOf(written string) ([]field, *source, error) {
-	qualifier, name, foreign := strings.Cut(written, ".")
-	if !foreign {
-		fields, err := u.pkg.structFields(written)
-		return fields, u.pkg, err
-	}
-	importPath, err := u.use(qualifier, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-	src, err := u.loader.loadImport(importPath)
-	if err != nil {
-		return nil, nil, err
-	}
-	fields, err := src.structFields(name)
-	if err != nil {
-		return nil, nil, err
-	}
-	if u.foreign == nil {
-		u.foreign = map[*source]string{}
-	}
-	u.foreign[src] = qualifier
-	for _, f := range fields {
-		if !ast.IsExported(f.name) {
-			return nil, nil, fmt.Errorf("%s has unexported field %s; generate inside its package instead", written, f.name)
+	qualifier, _, qualified := strings.Cut(written, ".")
+	if qualified {
+		if _, err := u.use(qualifier, nil); err != nil {
+			return nil, nil, err
 		}
 	}
-	return fields, src, nil
+	named, err := u.resolveNamed(written)
+	if err != nil {
+		return nil, nil, err
+	}
+	fields, err := named.src.structFields(named.name)
+	if named.aliased && err != nil {
+		return nil, nil, fmt.Errorf("%s is an alias of %s.%s: %w", written, named.src.path, named.name, err)
+	}
+	if err != nil || named.src == u.pkg {
+		return fields, named.src, err
+	}
+	if !named.aliased && u.foreign[named.src] == "" {
+		if u.foreign == nil {
+			u.foreign = map[*source]string{}
+		}
+		u.foreign[named.src] = qualifier
+	}
+	for _, f := range fields {
+		if ast.IsExported(f.name) {
+			continue
+		}
+		if named.aliased {
+			return nil, nil, fmt.Errorf("%s is an alias of %s.%s, which has unexported field %s; generate inside %s instead", written, named.src.path, named.name, f.name, named.src.path)
+		}
+		return nil, nil, fmt.Errorf("%s has unexported field %s; generate inside its package instead", written, f.name)
+	}
+	return fields, named.src, nil
 }
 
 // rules checks field coverage and orders parsed rules by declaration.
@@ -160,22 +167,29 @@ func (u *unit) typeText(src *source, f field, expr ast.Expr) (string, error) {
 			return "", err
 		}
 	}
-	return u.written(src, expr), nil
+	text := u.written(src, expr)
+	if src != u.pkg && text != u.loader.text(expr) {
+		qualifier := u.qualifierOf(src)
+		if previous, ok := u.imports[qualifier]; ok && previous != src.path {
+			return "", fmt.Errorf("qualifier %s names both %s and %s", qualifier, previous, src.path)
+		}
+		u.imports[qualifier] = src.path
+	}
+	return text, nil
 }
 
-// written prints a field type as the output package spells it: a qualified
-// target's own exported type names gain the configuration's qualifier.
+// written prints a field type as the output package spells it: a foreign
+// struct's own exported type names gain that package's qualifier.
 func (u *unit) written(src *source, expr ast.Expr) string {
 	text := u.loader.text(expr)
-	qualifier := u.foreign[src]
-	if qualifier == "" {
+	if src == u.pkg {
 		return text
 	}
 	parsed, err := parser.ParseExpr(text)
 	if err != nil {
 		return text
 	}
-	qualifyNames(parsed, qualifier)
+	qualifyNames(parsed, u.qualifierOf(src))
 	var out bytes.Buffer
 	if err := printer.Fprint(&out, token.NewFileSet(), parsed); err != nil {
 		return text

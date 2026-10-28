@@ -155,27 +155,6 @@ func embeddedName(expr ast.Expr) string {
 	}
 }
 
-// shapeOf classifies a field type and returns its element and key types. A
-// local named type is followed one level to its declared container.
-func (s *source) shapeOf(expr ast.Expr) (shape, ast.Expr, ast.Expr) {
-	if ident, ok := expr.(*ast.Ident); ok {
-		if spec := s.types[ident.Name]; spec != nil && spec.TypeParams == nil {
-			expr = spec.Type
-		}
-	}
-	switch e := expr.(type) {
-	case *ast.StarExpr:
-		return pointerShape, e.X, nil
-	case *ast.ArrayType:
-		if e.Len == nil {
-			return sliceShape, e.Elt, nil
-		}
-	case *ast.MapType:
-		return mapShape, e.Value, e.Key
-	}
-	return otherShape, nil, nil
-}
-
 // importsOf maps each qualifier a file can use to its import path. Unnamed
 // imports use the last path element without a major-version suffix.
 func importsOf(file *ast.File) map[string]string {
