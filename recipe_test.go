@@ -134,3 +134,31 @@ func TestBundledRecipe(t *testing.T) {
 		t.Fatal("missing bundled recipe accepted")
 	}
 }
+
+// TestEqualRecipe checks the bundled equal recipe compares each field by its
+// rule and leaves an omitted field uncompared.
+func TestEqualRecipe(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "go.mod"), "module example.com/m\n\ngo 1.24\n")
+	write(t, filepath.Join(root, "p", "p.go"), source)
+	path := filepath.Join(root, "generate.boiler")
+	write(t, path, "recipe equal = \"boiler:equal\"\noutput \"p/boiler_equal_gen.go\" {\n"+
+		"equal equalItem(Item) {\nName = eq\nTags = each(eq)\ninner = omit\n}\n}\n")
+	config, err := boiler.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs, err := config.Compile("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	generated := string(outputs[0].Data)
+	for _, want := range []string{"left.Name != right.Name", "len(left.Tags) != len(right.Tags)", "left.Tags[i0] != right.Tags[i0]"} {
+		if !strings.Contains(generated, want) {
+			t.Errorf("generated equality lacks %q:\n%s", want, generated)
+		}
+	}
+	if strings.Contains(generated, "inner") {
+		t.Errorf("omitted field compared:\n%s", generated)
+	}
+}

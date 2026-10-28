@@ -1,0 +1,62 @@
+{{define "omit"}}{{end -}}
+
+{{define "eq" -}}
+if left{{.Dst}} != right{{.Dst}} {
+    return false
+}
+{{end -}}
+
+{{define "slices" -}}
+if !{{import "slices"}}.Equal(left{{.Dst}}, right{{.Dst}}) {
+    return false
+}
+{{end -}}
+
+{{define "maps" -}}
+if !{{import "maps"}}.Equal(left{{.Dst}}, right{{.Dst}}) {
+    return false
+}
+{{end -}}
+
+{{define "method" -}}
+if !left{{.Dst}}.{{ident (index .Rule.Args 0)}}(right{{.Dst}}) {
+    return false
+}
+{{end -}}
+
+{{define "func" -}}
+if !{{qualified (index .Rule.Args 0)}}(left{{.Dst}}, right{{.Dst}}) {
+    return false
+}
+{{end -}}
+
+{{define "call" -}}
+if !{{ident (index .Rule.Args 0)}}(left{{.Dst}}, right{{.Dst}}) {
+    return false
+}
+{{end -}}
+
+{{define "equal" -}}
+{{$callee := targetFor .Target.Recipe .Shape.Written -}}
+if !{{$callee.Name}}(left{{.Dst}}, right{{.Dst}}) {
+    return false
+}
+{{end -}}
+
+{{define "each" -}}
+if len(left{{.Dst}}) != len(right{{.Dst}}) {
+    return false
+}
+{{if eq .Shape.Kind "slice" -}}
+for i{{.Depth}} := range left{{.Dst}} {
+    {{child . 0 (printf "%s[i%d]" .Dst .Depth) -}}
+}
+{{else -}}
+for k{{.Depth}} := range left{{.Dst}} {
+    if _, present := right{{.Dst}}[k{{.Depth}}]; !present {
+        return false
+    }
+    {{child . 0 (printf "%s[k%d]" .Dst .Depth) -}}
+}
+{{end -}}
+{{end -}}

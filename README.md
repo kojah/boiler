@@ -343,6 +343,11 @@ Boiler imposes no runtime dependency on consumers.
 | `visit` | required `child` | `keep`, `apply`, `each` |
 | `transform` | required `child` | `keep`, `apply`, `each` |
 | `key` | required `result`, optional `params` | `omit`, `to FIELD`, `to FIELD from PARAM` |
+| `equal` | none | `eq`, `slices`, `maps`, `equal`, `call NAME`, `func NAME`, `method NAME`, `each(RULE)`, `omit` |
+
+`equal` generates `NAME(left, right T) bool`. `each` requires equal lengths
+and, for maps, the same keys before comparing elements; `equal` calls another
+equal target for the field's type; `omit` leaves a field uncompared.
 
 Snapshots retain nil containers. `clone` is shallow; `each` and `entries` apply
 nested rules to copied contents. `snapshot` resolves another target using the

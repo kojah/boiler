@@ -1,0 +1,16 @@
+eq: {}
+slices:
+  accepts: [slice]
+maps:
+  accepts: [map]
+method:
+  args: [1]
+func:
+  args: [1]
+call:
+  args: [1]
+equal: {}
+each:
+  accepts: [slice, map]
+  children: [element]
+omit: {}

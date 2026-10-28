@@ -1,0 +1,6 @@
+version: 1
+entry: target
+templates: ["*.go.tmpl"]
+rules: rules.yaml
+local: false
+options: {}
