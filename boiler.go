@@ -34,6 +34,7 @@ type Config struct {
 
 // Output groups targets into a generated file; its path identifies the output.
 type Output struct {
+	Build   string
 	Package string
 	Out     string
 	Targets []Target

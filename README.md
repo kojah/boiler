@@ -89,6 +89,13 @@ in lexical filename order. Within each file, block order is preserved. Shared
 aliases are resolved after all sources are read, with no order-dependent overrides.
 Duplicate aliases, settings and resolved output paths fail validation.
 
+An output can select a Go build configuration with
+`output "boiler_checks_gen.go" build("contracts") { ... }`. The optional
+constraint must be a nonempty, valid Go build expression on one line. Boiler
+emits its `//go:build` line before the generated marker and package clause.
+Use a separate output with `build("!contracts")` for native counterparts;
+field coverage is checked for every output regardless of the active build.
+
 A target is `RECIPE NAME(TYPE) OPTION(ARGUMENTS)... { FIELD_RULES }`.
 Target names are unique per output and type, so a recipe that emits methods can
 use one name, such as `Add`, for several receiver types; Go type checking still

@@ -44,6 +44,7 @@ func (Output) block()  {}
 
 // Output groups generation targets under an output path.
 type Output struct {
+	Build   string
 	Path    string
 	Targets []Target
 	Pos     Position

@@ -2,7 +2,9 @@ package boiler
 
 import (
 	"fmt"
+	"go/build/constraint"
 	"path/filepath"
+	"strings"
 
 	"github.com/kojah/boiler/internal/syntax"
 )
@@ -83,6 +85,16 @@ func lowerBlock(block syntax.Block) ([]Output, error) {
 
 func lowerOutput(directory string, input syntax.Output) (Output, error) {
 	result := Output{Package: filepath.Dir(input.Path), Out: input.Path}
+	if input.Build != "" {
+		if strings.ContainsAny(input.Build, "\r\n") {
+			return result, fmt.Errorf("%s: build constraint must occupy one line", input.Pos)
+		}
+		parsed, err := constraint.Parse("//go:build " + input.Build)
+		if err != nil {
+			return result, fmt.Errorf("%s: invalid build constraint: %w", input.Pos, err)
+		}
+		result.Build = parsed.String()
+	}
 	if directory != "" {
 		if !localPath(input.Path) || filepath.Base(input.Path) != input.Path {
 			return result, fmt.Errorf("%s: package output must be a filename, got %q", input.Pos, input.Path)

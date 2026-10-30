@@ -127,6 +127,23 @@ func (p *parser) output(pos Position) (Output, error) {
 	}
 	result := Output{Path: path, Pos: pos}
 	p.breaks()
+	if p.peek().text == "build" {
+		p.at++
+		if err := p.expect('('); err != nil {
+			return result, err
+		}
+		result.Build, err = p.string()
+		if err != nil {
+			return result, err
+		}
+		if result.Build == "" {
+			return result, fmt.Errorf("%s: build constraint must not be empty", pos)
+		}
+		if err := p.expect(')'); err != nil {
+			return result, err
+		}
+		p.breaks()
+	}
 	if err := p.expect('{'); err != nil {
 		return result, err
 	}

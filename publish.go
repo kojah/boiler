@@ -27,7 +27,7 @@ func (c *Config) Publish(artifacts []Artifact, check bool) error {
 			problems = append(problems, "missing "+c.rel(a.Path))
 		case err != nil:
 			return err
-		case !bytes.HasPrefix(old, []byte(header)):
+		case !hasBoilerHeader(old):
 			return fmt.Errorf("%s exists without the boiler header; refusing to overwrite", c.rel(a.Path))
 		case !bytes.Equal(old, a.Data):
 			problems = append(problems, "stale "+c.rel(a.Path))
@@ -88,7 +88,7 @@ func (c *Config) obsolete(produced map[string]bool) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
-			if bytes.HasPrefix(data, []byte(header)) {
+			if hasBoilerHeader(data) {
 				result = append(result, file)
 			}
 		}
@@ -116,4 +116,16 @@ func writeAtomic(path string, data []byte) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// hasBoilerHeader recognizes our marker with an optional leading build line.
+func hasBoilerHeader(data []byte) bool {
+	if bytes.HasPrefix(data, []byte("//go:build ")) {
+		_, tail, found := bytes.Cut(data, []byte("\n\n"))
+		if !found {
+			return false
+		}
+		data = tail
+	}
+	return bytes.HasPrefix(data, []byte(header))
 }

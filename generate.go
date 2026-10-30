@@ -47,6 +47,7 @@ func (c *Config) Compile(name string) ([]Artifact, error) {
 
 // unit accumulates one generated file.
 type unit struct {
+	build     string
 	config    *Config
 	loader    *loader
 	pkg       *source
@@ -68,7 +69,7 @@ func (c *Config) compileOutput(l *loader, output Output) ([]byte, error) {
 	if len(pkg.files) == 0 {
 		return nil, fmt.Errorf("package %s has no Go files", output.Package)
 	}
-	u := &unit{config: c, loader: l, pkg: pkg, name: pkg.files[0].Name.Name, imports: map[string]string{}, targets: output.Targets, allocated: map[string]bool{}}
+	u := &unit{build: output.Build, config: c, loader: l, pkg: pkg, name: pkg.files[0].Name.Name, imports: map[string]string{}, targets: output.Targets, allocated: map[string]bool{}}
 	for _, target := range output.Targets {
 		if err := u.expand(target); err != nil {
 			return nil, fmt.Errorf("target %s: %w", target.Name, err)
@@ -253,6 +254,9 @@ func (u *unit) useImport(importPath string) string {
 
 func (u *unit) render() ([]byte, error) {
 	var out bytes.Buffer
+	if u.build != "" {
+		fmt.Fprintf(&out, "//go:build %s\n\n", u.build)
+	}
 	out.WriteString(header + "\npackage " + u.name + "\n")
 	if len(u.imports) > 0 {
 		names := make([]string, 0, len(u.imports))
